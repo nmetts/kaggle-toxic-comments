@@ -1,0 +1,288 @@
+"""
+A module to transform features, cross-validate, or make predictions for the Toxic Comments contest.
+
+Created on January 18, 2018
+
+@author: Nicolas Metts
+"""
+
+import argparse
+import csv
+import os
+import re
+
+import numpy as np
+import pandas as pd
+from mlxtend.classifier import StackingClassifier
+from nltk.stem import WordNetLemmatizer
+from sklearn.ensemble import AdaBoostClassifier, BaggingClassifier, GradientBoostingClassifier, RandomForestClassifier
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics import log_loss
+from sklearn.model_selection import train_test_split
+from textblob import TextBlob
+
+# Name of label columns
+LABEL_COLUMNS = ['toxic', 'severe_toxic', 'obscene', 'threat', 'insult', 'identity_hate']
+
+# Actions
+CREATE_FEATURE_FILES = 'create_feature_files'
+CROSS_VALIDATE = 'cross_validate'
+PREDICT_TEST = 'predict_test'
+
+# Features
+LEMMATIZE = 'lemmatize'
+SENTIMENT = 'sentiment'
+CORRECT_SPELLING = 'correct_spelling'
+POS_REPLACE = 'pos_replace'
+
+# Classifiers
+RANDOM_FOREST = 'random_forest'
+ADABOOST = 'adaboost'
+BAGGING = 'bagging'
+GRADIENT_BOOSTING = 'gradient_boosting'
+STACKING = 'stacking'
+
+row_index = 0
+
+
+def correct_spelling(row_str):
+    return str(TextBlob(row_str).correct())
+
+
+def pos_replace(row_str):
+    tags = TextBlob(row_str).tags
+    tag_replace = ['CC', 'CD', 'DT', 'IN', 'NN', 'NNP', 'NNS', 'PRP', 'PRP$', 'WP']
+    return " ".join([x[1] if x[1] in tag_replace else x[0] for x in tags])
+
+
+def get_sentiment_analysis(row_str):
+    blob = TextBlob(row_str)
+    return blob.sentiment.polarity, blob.sentiment.subjectivity
+
+
+def get_polarity(row):
+    return row[0]
+
+
+def get_subjectivity(row):
+    return row[1]
+
+
+def remove_punctuation(row_str):
+    try:
+        global row_index
+        row_index += 1
+        return re.sub(r"\W", " ", row_str)
+    except TypeError:
+        print("Type error on: {}".format(row_str))
+        print("Type is: {}".format(type(row_str)))
+        print("Row index: {}".format(row_index))
+        exit(1)
+
+
+def lemmatize(row_str):
+    wnl = WordNetLemmatizer()
+    return " ".join([wnl.lemmatize(x) for x in row_str.split()])
+
+
+def get_features(df, features):
+    if not features:
+        return df
+    if CORRECT_SPELLING in features:
+        print("Correcting spelling")
+        df = df.assign(comment_text=df.comment_text.apply(correct_spelling))
+    if LEMMATIZE in features:
+        df = df.assign(comment_text=df.comment_text.apply(lemmatize))
+    if SENTIMENT in features:
+        t = df.comment_text.apply(get_sentiment_analysis)
+        df = df.assign(polarity=t.apply(get_polarity))
+        df = df.assign(subjectivity=t.apply(get_subjectivity))
+    if POS_REPLACE in features:
+        df = df.assign(comment_text=df.comment_text.apply(pos_replace))
+    return df
+
+
+def create_feature_files(train_data, test_data, features):
+    """
+    A function to create CSV files that can be used to directly predict or cross-validate,
+    thus eliminating the need to do feature engineering.
+
+    Params:
+        train_data(str): The name of the train CSV file
+        test_data(str): The name of the test CSV file
+        param features(list): A list of features to be used
+    """
+    train_df = pd.read_csv(train_data)
+    train_labels = train_df[LABEL_COLUMNS]
+
+    # Save the train labels to file if not already saved
+    label_file_name = os.path.dirname(train_data) + os.path.sep + "train_labels.csv"
+    if not os.path.exists(label_file_name):
+        train_labels.to_csv(label_file_name, index=False, index_label=False)
+
+    train_df.drop(LABEL_COLUMNS, axis=1, inplace=True)
+    test_df = pd.read_csv(test_data, na_filter=False)
+    train_df = train_df.assign(comment_text=train_df.comment_text.apply(remove_punctuation))
+    test_df = test_df.assign(comment_text=test_df.comment_text.apply(remove_punctuation))
+    print("Getting features for train data")
+    train_features = get_features(train_df, features)
+    print("Getting features for test data")
+    test_features = get_features(test_df, features)
+
+    vectorizer = TfidfVectorizer(max_df=0.8, min_df=0.01)
+    print("Fitting and transforming train data")
+    train_matrix = pd.SparseDataFrame(vectorizer.fit_transform(train_features.comment_text))
+    print("Transforming test data")
+    test_matrix = pd.SparseDataFrame(vectorizer.transform(test_features.comment_text))
+
+    if 'subjectivity' in train_features.columns and 'polarity' in train_features.columns:
+        print("Adding polarity and subjectivity to train matrix")
+        train_matrix = train_matrix.assign(subjectivity=train_features.subjectivity)
+        train_matrix = train_matrix.assign(polarity=train_features.polarity)
+
+        print("Adding polarity and subjectivity to test matrix")
+        test_matrix = test_matrix.assign(subjectivity=test_features.subjectivity)
+        test_matrix = test_matrix.assign(polarity=test_features.polarity)
+
+    # Need the IDs for the test file
+    test_matrix = test_matrix.assign(id=test_df.id)
+    train_path = os.path.dirname(train_data)
+    test_path = os.path.dirname(test_data)
+    new_train_name = train_path + os.path.sep + \
+                     (os.path.basename(train_data).split('csv')[0] + "_".join(features) + ".csv")
+    new_test_name = test_path + os.path.sep + \
+                     (os.path.basename(test_data).split('csv')[0] + "_".join(features) + ".csv")
+
+    print("Writing train matrix to file")
+    train_matrix.to_csv(new_train_name, index=False, index_label=False)
+    print("Writing test matrix to file")
+    test_matrix.to_csv(new_test_name, index=False, index_label=False)
+
+
+def get_classifiers(clf_names):
+    """
+    A function to get a list of classifiers.
+
+    Params:
+        clf_names(list): A list of classifier names
+
+    Return:
+         A list of classifier objects.
+    """
+    clf_list = []
+
+    if RANDOM_FOREST in clf_names:
+        clf_list.append(RandomForestClassifier(n_jobs=-1, n_estimators=400))
+    if ADABOOST in clf_names:
+        clf_list.append(AdaBoostClassifier(n_estimators=400))
+    if BAGGING in clf_names:
+        clf_list.append(BaggingClassifier(n_jobs=-1, n_estimators=400))
+    if GRADIENT_BOOSTING in clf_names:
+        clf_list.append(GradientBoostingClassifier(n_estimators=400))
+    if STACKING in clf_names:
+        meta_clf = GradientBoostingClassifier(n_estimators=400)
+        clf = StackingClassifier(classifiers=clf_list, meta_classifier=meta_clf, use_probas=True)
+        clf_list = [clf]
+    return clf_list
+
+
+def predict(train_file, labels_file, test_file, classifiers):
+    """
+    A function to make predictions and write them to file. All parameters are required.
+
+    Params:
+        train_file(str): The name of the train file
+        labels_file(str): The name of the labels file
+        test_file(str): The name of the test file
+        classifiers(list): A list of classifier names
+    """
+    train_data = pd.read_csv(train_file)
+    labels_df = pd.read_csv(labels_file)
+    test_data = pd.read_csv(test_file)
+    ids = test_data.id
+
+    clf_list = get_classifiers(classifiers)
+
+    for clf in clf_list:
+        print("Using classifier: {}".format(clf))
+        print("Fitting to train data")
+        clf.fit(X=train_data, y=labels_df)
+        print("Making predictions")
+        predictions = clf.predict_proba(test_data)
+        preds_file_name = os.path.dirname(test_file) + os.path.sep + clf.__class__.__name__ + "_predictions.csv"
+
+        print("Writing predictions to file")
+        with open(preds_file_name, 'w') as preds_file:
+            writer = csv.writer(preds_file)
+            header_row = ['id'] + LABEL_COLUMNS
+            writer.writerow(header_row)
+            for id, preds in zip(ids, predictions):
+                row = [id] + list(predictions)
+                writer.writerow(row)
+
+
+def get_mean_log_loss(y_true, y_pred):
+    """
+    A function to calculate the mean log loss across columns
+
+    Params:
+        y_true(numpy.array):  The Numpy array of true labels
+        y_pred(numpy.array): The Numpy array of log probabilities for each label column
+
+    Throws AssertionError is y_true.shape != y_pred.shape
+    """
+    assert(y_true.shape == y_pred.shape)
+    return np.mean([log_loss(y_true=y_true[..., col_idx], y_pred=y_pred[..., col_idx])
+                    for col_idx in range(y_true.shape[1])])
+
+
+def cross_validate(train_file, labels_file, classifiers):
+    """
+    A function to perform cross-validation
+
+    Params:
+        train_file(str): The name of the train file. Expected to be a CSV file transformed and ready for fitting.
+        labels_file(str): The name of the file with labels
+        classifiers(list): A list of classifiers to be used in cross-validation
+    """
+    data = pd.read_csv(train_file)
+    labels_df = pd.read_csv(labels_file)
+    data = data.merge(labels_df, right_index=True, left_index=True)
+
+    train_data, test_data = train_test_split(data, test_size=0.2)
+    train_labels = train_data[LABEL_COLUMNS]
+    test_labels = test_data[LABEL_COLUMNS].values
+
+    train_data.drop(LABEL_COLUMNS, axis=1, inplace=True)
+    test_data.drop(LABEL_COLUMNS, axis=1, inplace=True)
+    clf_list = get_classifiers(classifiers)
+
+    for clf in clf_list:
+        print("Using classifier: {}".format(clf.__class__.__name__))
+        print("Fitting to train data")
+        clf.fit(X=train_data, y=train_labels)
+        print("Making predictions")
+        predictions = clf.predict_proba(test_data)
+        print("Calculating log loss")
+        loss = get_mean_log_loss(y_true=test_labels, y_pred=predictions)
+        print("Loss is: {}".format(loss))
+
+
+if __name__ == '__main__':
+    argparser = argparse.ArgumentParser()
+    argparser.add_argument('--train_file', type=str, help='Name of the train data', required=True)
+    argparser.add_argument('--test_file', type=str, help='Name of the test data file')
+    argparser.add_argument('--labels_file', type=str, help='Name of the labels file. Required for cross-validation')
+    argparser.add_argument('--features', nargs='+', help='The features to be used')
+    argparser.add_argument('--classifiers', nargs='+', help='The features to be used')
+    argparser.add_argument('--action', type=str, help='Name of the action to take',
+                           choices=[CREATE_FEATURE_FILES, CROSS_VALIDATE, PREDICT_TEST])
+    args = argparser.parse_args()
+
+    if args.action == CROSS_VALIDATE:
+        cross_validate(train_file=args.train_file, labels_file=args.labels_file, classifiers=args.classifiers)
+    elif args.action == CREATE_FEATURE_FILES:
+        create_feature_files(train_data=args.train_file, test_data=args.test_file, features=args.features)
+    elif args.action == PREDICT_TEST:
+        predict(train_file=args.train_file, test_file=args.test_file, labels_file=args.labels_file,
+                classifiers=args.classifiers)
