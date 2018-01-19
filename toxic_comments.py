@@ -134,9 +134,9 @@ def create_feature_files(train_data, test_data, features):
 
     vectorizer = TfidfVectorizer(max_df=0.8, min_df=0.01)
     print("Fitting and transforming train data")
-    train_matrix = pd.SparseDataFrame(vectorizer.fit_transform(train_features.comment_text))
+    train_matrix = pd.DataFrame(vectorizer.fit_transform(train_features.comment_text).toarray())
     print("Transforming test data")
-    test_matrix = pd.SparseDataFrame(vectorizer.transform(test_features.comment_text))
+    test_matrix = pd.DataFrame(vectorizer.transform(test_features.comment_text).toarray())
 
     if 'subjectivity' in train_features.columns and 'polarity' in train_features.columns:
         print("Adding polarity and subjectivity to train matrix")
