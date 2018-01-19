@@ -152,9 +152,9 @@ def create_feature_files(train_data, test_data, features):
     train_path = os.path.dirname(train_data)
     test_path = os.path.dirname(test_data)
     new_train_name = train_path + os.path.sep + \
-                     (os.path.basename(train_data).split('csv')[0] + "_".join(features) + ".csv")
+                     (os.path.basename(train_data).split('.csv')[0] + "_".join(features) + ".csv")
     new_test_name = test_path + os.path.sep + \
-                    (os.path.basename(test_data).split('csv')[0] + "_".join(features) + ".csv")
+                    (os.path.basename(test_data).split('.csv')[0] + "_".join(features) + ".csv")
 
     print("Writing train matrix to file")
     train_matrix.to_csv(new_train_name, index=False, index_label=False)
@@ -253,8 +253,8 @@ def cross_validate(train_file, labels_file, classifiers):
     data = data.merge(labels_df, right_index=True, left_index=True)
 
     train_data, test_data = train_test_split(data, test_size=0.2)
-    train_labels = train_data[LABEL_COLUMNS]
-    test_labels = test_data[LABEL_COLUMNS].values
+    train_labels = train_data[LABEL_COLUMNS].as_matrix()
+    test_labels = test_data[LABEL_COLUMNS].as_matrix()
 
     train_data.drop(LABEL_COLUMNS, axis=1, inplace=True)
     test_data.drop(LABEL_COLUMNS, axis=1, inplace=True)
