@@ -211,7 +211,10 @@ def predict(train_file, labels_file, test_file, classifiers):
         print("Fitting to train data")
         clf.fit(X=train_data, y=labels_df)
         print("Making predictions")
-        predictions = clf.predict_proba(test_data)
+        predictions = np.array(clf.predict_proba(test_data))
+        p_shape = predictions.shape
+        predictions = predictions.reshape(p_shape[1], p_shape[0], p_shape[2])
+        predictions = predictions[:, :, 1]
         preds_file_name = os.path.dirname(test_file) + os.path.sep + clf.__class__.__name__ + "_predictions.csv"
 
         print("Writing predictions to file")
@@ -219,8 +222,8 @@ def predict(train_file, labels_file, test_file, classifiers):
             writer = csv.writer(preds_file)
             header_row = ['id'] + LABEL_COLUMNS
             writer.writerow(header_row)
-            for id, preds in zip(ids, predictions):
-                row = [id] + list(predictions)
+            for row_id, preds in zip(ids, predictions):
+                row = [row_id] + list(preds)
                 writer.writerow(row)
 
 
@@ -265,7 +268,10 @@ def cross_validate(train_file, labels_file, classifiers):
         print("Fitting to train data")
         clf.fit(X=train_data, y=train_labels)
         print("Making predictions")
-        predictions = clf.predict_proba(test_data)
+        predictions = np.array(clf.predict_proba(test_data))
+        p_shape = predictions.shape
+        predictions = predictions.reshape(p_shape[1], p_shape[0], p_shape[2])
+        predictions = predictions[:, :, 1]
         print("Calculating log loss")
         loss = get_mean_log_loss(y_true=test_labels, y_pred=predictions)
         print("Loss is: {}".format(loss))
