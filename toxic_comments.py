@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 from mlxtend.classifier import StackingClassifier
 from nltk.stem import WordNetLemmatizer
-from sklearn.ensemble import ExtraTreesClassifier, GradientBoostingClassifier, RandomForestClassifier
+from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import log_loss
 from sklearn.model_selection import train_test_split
@@ -179,11 +179,11 @@ def get_classifiers(clf_names):
     if MLP in clf_names:
         clf_list.append(MLPClassifier(hidden_layer_sizes=(200, 100, 50)))
     if EXTRA_TREES in clf_names:
-        clf_list.append(RandomForestClassifier(n_jobs=-1, n_estimators=400))
+        clf_list.append(ExtraTreesClassifier(n_jobs=-1, n_estimators=400))
     if STACKING in clf_names:
-        meta_clf = GradientBoostingClassifier(n_estimators=400)
+        meta_clf = RandomForestClassifier(n_jobs=-1, n_estimators=400)
         clf = StackingClassifier(classifiers=clf_list, meta_classifier=meta_clf, use_probas=True)
-        clf_list = [clf]
+        clf_list.append(clf)
     return clf_list
 
 
