@@ -92,12 +92,15 @@ def get_features(df, features):
         print("Correcting spelling")
         df = df.assign(comment_text=df.comment_text.apply(correct_spelling))
     if LEMMATIZE in features:
+        print("Lemmatizing words")
         df = df.assign(comment_text=df.comment_text.apply(lemmatize))
     if SENTIMENT in features:
+        print("Performing sentiment analysis")
         t = df.comment_text.apply(get_sentiment_analysis)
         df = df.assign(polarity=t.apply(get_polarity))
         df = df.assign(subjectivity=t.apply(get_subjectivity))
     if POS_REPLACE in features:
+        print("Replacing words with POS tag")
         df = df.assign(comment_text=df.comment_text.apply(pos_replace))
     return df
 
@@ -151,7 +154,7 @@ def create_feature_files(train_data, test_data, features):
     new_train_name = train_path + os.path.sep + \
                      (os.path.basename(train_data).split('csv')[0] + "_".join(features) + ".csv")
     new_test_name = test_path + os.path.sep + \
-                     (os.path.basename(test_data).split('csv')[0] + "_".join(features) + ".csv")
+                    (os.path.basename(test_data).split('csv')[0] + "_".join(features) + ".csv")
 
     print("Writing train matrix to file")
     train_matrix.to_csv(new_train_name, index=False, index_label=False)
@@ -231,7 +234,7 @@ def get_mean_log_loss(y_true, y_pred):
 
     Throws AssertionError is y_true.shape != y_pred.shape
     """
-    assert(y_true.shape == y_pred.shape)
+    assert (y_true.shape == y_pred.shape)
     return np.mean([log_loss(y_true=y_true[..., col_idx], y_pred=y_pred[..., col_idx])
                     for col_idx in range(y_true.shape[1])])
 
