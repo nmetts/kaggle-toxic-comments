@@ -15,10 +15,11 @@ import numpy as np
 import pandas as pd
 from mlxtend.classifier import StackingClassifier
 from nltk.stem import WordNetLemmatizer
-from sklearn.ensemble import AdaBoostClassifier, BaggingClassifier, GradientBoostingClassifier, RandomForestClassifier
+from sklearn.ensemble import ExtraTreesClassifier, GradientBoostingClassifier, RandomForestClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import log_loss
 from sklearn.model_selection import train_test_split
+from sklearn.neural_network import MLPClassifier
 from textblob import TextBlob
 
 # Name of label columns
@@ -37,9 +38,8 @@ POS_REPLACE = 'pos_replace'
 
 # Classifiers
 RANDOM_FOREST = 'random_forest'
-ADABOOST = 'adaboost'
-BAGGING = 'bagging'
-GRADIENT_BOOSTING = 'gradient_boosting'
+EXTRA_TREES = 'extra_trees'
+MLP = 'mlp'
 STACKING = 'stacking'
 
 row_index = 0
@@ -176,12 +176,10 @@ def get_classifiers(clf_names):
 
     if RANDOM_FOREST in clf_names:
         clf_list.append(RandomForestClassifier(n_jobs=-1, n_estimators=400))
-    if ADABOOST in clf_names:
-        clf_list.append(AdaBoostClassifier(n_estimators=400))
-    if BAGGING in clf_names:
-        clf_list.append(BaggingClassifier(n_jobs=-1, n_estimators=400))
-    if GRADIENT_BOOSTING in clf_names:
-        clf_list.append(GradientBoostingClassifier(n_estimators=400))
+    if MLP in clf_names:
+        clf_list.append(MLPClassifier(hidden_layer_sizes=(200, 100, 50)))
+    if EXTRA_TREES in clf_names:
+        clf_list.append(RandomForestClassifier(n_jobs=-1, n_estimators=400))
     if STACKING in clf_names:
         meta_clf = GradientBoostingClassifier(n_estimators=400)
         clf = StackingClassifier(classifiers=clf_list, meta_classifier=meta_clf, use_probas=True)
