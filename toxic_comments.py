@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 from mlxtend.classifier import StackingClassifier
 from nltk.stem import WordNetLemmatizer
+from scipy.sparse import hstack
 from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import log_loss
@@ -35,6 +36,13 @@ LEMMATIZE = 'lemmatize'
 SENTIMENT = 'sentiment'
 CORRECT_SPELLING = 'correct_spelling'
 POS_REPLACE = 'pos_replace'
+REMOVE_PUNCTUATION = 'remove_punctuation'
+SPECIAL_CHARACTER_COUNT = 'special_character_count'
+NUM_WORDS = 'num_words'
+MEAN_WORD_LENGTH = 'mean_word_length'
+UNIQUE_WORDS = 'num_unique_words'
+
+ADDITIONAL_COLUMN_FEATURES = [SPECIAL_CHARACTER_COUNT, NUM_WORDS, MEAN_WORD_LENGTH, UNIQUE_WORDS]
 
 # Classifiers
 RANDOM_FOREST = 'random_forest'
@@ -68,6 +76,22 @@ def get_subjectivity(row):
     return row[1]
 
 
+def get_num_words(row_str):
+    return len(row_str.split())
+
+
+def get_mean_word_length(row_str):
+    return len(row_str.replace(" ", ""))/len(row_str.split())
+
+
+def get_unique_words(row_str):
+    return len(set(row_str.split()))
+
+
+def get_special_character_count(row_str):
+    return len(re.sub(r"\w", "", row_str.replace(" ", "")))
+
+
 def remove_punctuation(row_str):
     try:
         global row_index
@@ -88,6 +112,8 @@ def lemmatize(row_str):
 def get_features(df, features):
     if not features:
         return df
+    if REMOVE_PUNCTUATION in features:
+        df = df.assign(comment_text=df.comment_text.apply(remove_punctuation))
     if CORRECT_SPELLING in features:
         print("Correcting spelling")
         df = df.assign(comment_text=df.comment_text.apply(correct_spelling))
@@ -99,6 +125,18 @@ def get_features(df, features):
         t = df.comment_text.apply(get_sentiment_analysis)
         df = df.assign(polarity=t.apply(get_polarity))
         df = df.assign(subjectivity=t.apply(get_subjectivity))
+    if SPECIAL_CHARACTER_COUNT in features:
+        print("Finding special character count")
+        df = df.assign(special_character_count=df.comment_text.apply(get_special_character_count))
+    if NUM_WORDS in features:
+        print("Finding number of words")
+        df = df.assign(num_words=df.comment_text.apply(get_num_words))
+    if MEAN_WORD_LENGTH in features:
+        print("Finding mean word length")
+        df = df.assign(mean_word_length=df.comment_text.apply(get_mean_word_length))
+    if UNIQUE_WORDS in features:
+        print("Finding number of unique words")
+        df = df.assign(num_unique_words=df.comment_text.apply(get_unique_words))
     if POS_REPLACE in features:
         print("Replacing words with POS tag")
         df = df.assign(comment_text=df.comment_text.apply(pos_replace))
@@ -125,27 +163,32 @@ def create_feature_files(train_data, test_data, features):
 
     train_df.drop(LABEL_COLUMNS, axis=1, inplace=True)
     test_df = pd.read_csv(test_data, na_filter=False)
-    train_df = train_df.assign(comment_text=train_df.comment_text.apply(remove_punctuation))
-    test_df = test_df.assign(comment_text=test_df.comment_text.apply(remove_punctuation))
     print("Getting features for train data")
     train_features = get_features(train_df, features)
     print("Getting features for test data")
     test_features = get_features(test_df, features)
 
-    vectorizer = TfidfVectorizer(max_df=0.8, min_df=0.01)
+    vectorizer = TfidfVectorizer()
     print("Fitting and transforming train data")
-    train_matrix = pd.DataFrame(vectorizer.fit_transform(train_features.comment_text).toarray())
+    train_matrix = vectorizer.fit_transform(train_features.comment_text)
     print("Transforming test data")
-    test_matrix = pd.DataFrame(vectorizer.transform(test_features.comment_text).toarray())
+    test_matrix = vectorizer.transform(test_features.comment_text)
 
     if 'subjectivity' in train_features.columns and 'polarity' in train_features.columns:
         print("Adding polarity and subjectivity to train matrix")
-        train_matrix = train_matrix.assign(subjectivity=train_features.subjectivity)
-        train_matrix = train_matrix.assign(polarity=train_features.polarity)
+        train_matrix = hstack((train_matrix, train_features[['subjectivity', 'polarity']]))
+
+        #train_matrix = train_matrix.assign(subjectivity=train_features.subjectivity)
+        #train_matrix = train_matrix.assign(polarity=train_features.polarity)
 
         print("Adding polarity and subjectivity to test matrix")
-        test_matrix = test_matrix.assign(subjectivity=test_features.subjectivity)
-        test_matrix = test_matrix.assign(polarity=test_features.polarity)
+        test_matrix = hstack((test_matrix, test_features[['subjectivity', 'polarity']]))
+        #test_matrix = test_matrix.assign(subjectivity=test_features.subjectivity)
+        #test_matrix = test_matrix.assign(polarity=test_features.polarity)
+
+    additional_columns = [x for x in train_features.columns if x in ADDITIONAL_COLUMN_FEATURES]
+    train_matrix = hstack((train_matrix, train_features[additional_columns]))
+    test_matrix = hstack((test_matrix, test_features[additional_columns]))
 
     # Need the IDs for the test file
     test_matrix = test_matrix.assign(id=test_df.id)
