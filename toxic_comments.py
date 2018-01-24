@@ -160,12 +160,21 @@ def create_feature_files(train_data, test_data, features):
     train_labels = train_df[LABEL_COLUMNS]
 
     # Save the train labels to file if not already saved
-    label_file_name = os.path.dirname(train_data) + os.path.sep + "train_labels.csv"
+    label_file_name = "{}{}train_labels.csv".format(os.path.dirname(train_data), os.path.sep)
     if not os.path.exists(label_file_name):
         train_labels.to_csv(label_file_name, index=False, index_label=False)
 
     train_df.drop(LABEL_COLUMNS, axis=1, inplace=True)
     test_df = pd.read_csv(test_data, na_filter=False)
+    test_ids = test_df.id.values
+
+    # Save the test ids if not already saved
+    id_file_name = "{}{}test_ids.txt".format(os.path.dirname(test_data), os.path.sep)
+    if not os.path.exists(id_file_name):
+        with open(id_file_name) as id_file:
+            for test_id in test_ids:
+                id_file.write("{}\n".format(test_id))
+
     print("Getting features for train data")
     train_features = get_features(train_df, features)
     print("Getting features for test data")
@@ -181,20 +190,13 @@ def create_feature_files(train_data, test_data, features):
         print("Adding polarity and subjectivity to train matrix")
         train_matrix = hstack((train_matrix, train_features[['subjectivity', 'polarity']]))
 
-        #train_matrix = train_matrix.assign(subjectivity=train_features.subjectivity)
-        #train_matrix = train_matrix.assign(polarity=train_features.polarity)
-
         print("Adding polarity and subjectivity to test matrix")
         test_matrix = hstack((test_matrix, test_features[['subjectivity', 'polarity']]))
-        #test_matrix = test_matrix.assign(subjectivity=test_features.subjectivity)
-        #test_matrix = test_matrix.assign(polarity=test_features.polarity)
 
     additional_columns = [x for x in train_features.columns if x in ADDITIONAL_COLUMN_FEATURES]
     train_matrix = hstack((train_matrix, train_features[additional_columns]))
     test_matrix = hstack((test_matrix, test_features[additional_columns]))
 
-    # Need the IDs for the test file
-    test_matrix['id'] = test_df.id
     train_path = os.path.dirname(train_data)
     test_path = os.path.dirname(test_data)
     new_train_name = train_path + os.path.sep + \
@@ -203,10 +205,8 @@ def create_feature_files(train_data, test_data, features):
                     (os.path.basename(test_data).split('.csv')[0] + "_".join(features) + ".csv")
 
     print("Writing train matrix to file")
-    #train_matrix.to_csv(new_train_name, index=False, index_label=False)
     np.savetxt(new_train_name, train_matrix, delimiter=",")
     print("Writing test matrix to file")
-    #test_matrix.to_csv(new_test_name, index=False, index_label=False)
     np.savetxt(new_test_name, test_matrix, delimiter=",")
 
 
@@ -235,7 +235,7 @@ def get_classifiers(clf_names):
     return clf_list
 
 
-def predict(train_file, labels_file, test_file, classifiers):
+def predict(train_file, labels_file, test_file, id_file, classifiers):
     """
     A function to make predictions and write them to file. All parameters are required.
 
@@ -248,7 +248,7 @@ def predict(train_file, labels_file, test_file, classifiers):
     train_data = pd.read_csv(train_file)
     labels_df = pd.read_csv(labels_file)
     test_data = pd.read_csv(test_file)
-    ids = test_data.id
+    ids = np.loadtxt(id_file)
 
     clf_list = get_classifiers(classifiers)
 
@@ -328,6 +328,7 @@ if __name__ == '__main__':
     argparser.add_argument('--train_file', type=str, help='Name of the train data', required=True)
     argparser.add_argument('--test_file', type=str, help='Name of the test data file')
     argparser.add_argument('--labels_file', type=str, help='Name of the labels file. Required for cross-validation')
+    argparser.add_argument('--id_file', type=str, help='Name of the id file. Required for predictions')
     argparser.add_argument('--features', nargs='+', help='The features to be used')
     argparser.add_argument('--classifiers', nargs='+', help='The features to be used')
     argparser.add_argument('--action', type=str, help='Name of the action to take',
@@ -340,4 +341,4 @@ if __name__ == '__main__':
         create_feature_files(train_data=args.train_file, test_data=args.test_file, features=args.features)
     elif args.action == PREDICT_TEST:
         predict(train_file=args.train_file, test_file=args.test_file, labels_file=args.labels_file,
-                classifiers=args.classifiers)
+                id_file=args.id_file, classifiers=args.classifiers)
