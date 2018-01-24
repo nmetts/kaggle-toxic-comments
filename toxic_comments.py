@@ -84,7 +84,7 @@ def get_mean_word_length(row_str):
     if len(row_str.split()) == 0:
         return 0
     else:
-        return len(row_str.replace(" ", ""))/len(row_str.split())
+        return len(row_str.replace(" ", "")) / len(row_str.split())
 
 
 def get_unique_words(row_str):
@@ -194,15 +194,17 @@ def create_feature_files(train_data, test_data, features):
         test_matrix = hstack((test_matrix, test_features[['subjectivity', 'polarity']]))
 
     additional_columns = [x for x in train_features.columns if x in ADDITIONAL_COLUMN_FEATURES]
-    train_matrix = hstack((train_matrix, train_features[additional_columns]))
-    test_matrix = hstack((test_matrix, test_features[additional_columns]))
+    train_matrix = hstack((train_matrix, train_features[additional_columns])).tocsr()
+    test_matrix = hstack((test_matrix, test_features[additional_columns])).tocsr()
 
     train_path = os.path.dirname(train_data)
     test_path = os.path.dirname(test_data)
-    new_train_name = train_path + os.path.sep + \
-                     (os.path.basename(train_data).split('.csv')[0] + "_".join(features) + ".csv")
-    new_test_name = test_path + os.path.sep + \
-                    (os.path.basename(test_data).split('.csv')[0] + "_".join(features) + ".csv")
+    new_train_name = "{}{}{}{}.csv".format(train_path, os.path.sep,
+                                           os.path.basename(train_data).split('.csv')[0],
+                                           "_".join(features))
+    new_test_name = "{}{}{}{}.csv".format(test_path, os.path.sep,
+                                          os.path.basename(test_data).split('.csv')[0],
+                                          "_".join(features))
 
     print("Writing train matrix to file")
     np.savez(new_train_name, data=train_matrix.data, indices=train_matrix.indices,
