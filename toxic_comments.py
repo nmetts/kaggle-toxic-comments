@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 from mlxtend.classifier import StackingClassifier
 from nltk.stem import WordNetLemmatizer
-from scipy.sparse import hstack
+from scipy.sparse import csc_matrix, hstack
 from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import log_loss
@@ -194,15 +194,15 @@ def create_feature_files(train_data, test_data, features):
         test_matrix = hstack((test_matrix, test_features[['subjectivity', 'polarity']]))
 
     additional_columns = [x for x in train_features.columns if x in ADDITIONAL_COLUMN_FEATURES]
-    train_matrix = hstack((train_matrix, train_features[additional_columns])).tocsr()
-    test_matrix = hstack((test_matrix, test_features[additional_columns])).tocsr()
+    train_matrix = hstack((train_matrix, train_features[additional_columns]), format='csc')
+    test_matrix = hstack((test_matrix, test_features[additional_columns]), format='csc')
 
     train_path = os.path.dirname(train_data)
     test_path = os.path.dirname(test_data)
-    new_train_name = "{}{}{}{}.csv".format(train_path, os.path.sep,
+    new_train_name = "{}_{}{}{}.csv".format(train_path, os.path.sep,
                                            os.path.basename(train_data).split('.csv')[0],
                                            "_".join(features))
-    new_test_name = "{}{}{}{}.csv".format(test_path, os.path.sep,
+    new_test_name = "{}_{}{}{}.csv".format(test_path, os.path.sep,
                                           os.path.basename(test_data).split('.csv')[0],
                                           "_".join(features))
 
@@ -301,15 +301,17 @@ def cross_validate(train_file, labels_file, classifiers):
         labels_file(str): The name of the file with labels
         classifiers(list): A list of classifiers to be used in cross-validation
     """
-    data = pd.read_csv(train_file)
-    labels_df = pd.read_csv(labels_file)
-    data = data.merge(labels_df, right_index=True, left_index=True)
+    loader = np.load(train_file)
+    data = csc_matrix((loader['data'], loader['indices'], loader['indptr']), shape=loader['shape'])
+    labels_mat = pd.read_csv(labels_file).as_matrix()
+    data = hstack((data, labels_mat))
 
     train_data, test_data = train_test_split(data, test_size=0.2)
-    train_labels = train_data[LABEL_COLUMNS].as_matrix()
-    test_labels = test_data[LABEL_COLUMNS].as_matrix()
-    train_data.drop(LABEL_COLUMNS, axis=1, inplace=True)
-    test_data.drop(LABEL_COLUMNS, axis=1, inplace=True)
+    # Separate the labels columns from the train and test features
+    train_labels = train_data[:, -6:]
+    test_labels = test_data[:, -6:]
+    train_data = train_data[:, :-6]
+    test_data = test_data[:, :-6]
     clf_list = get_classifiers(classifiers)
 
     for clf in clf_list:
