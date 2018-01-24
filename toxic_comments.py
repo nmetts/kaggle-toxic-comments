@@ -171,7 +171,7 @@ def create_feature_files(train_data, test_data, features):
     # Save the test ids if not already saved
     id_file_name = "{}{}test_ids.txt".format(os.path.dirname(test_data), os.path.sep)
     if not os.path.exists(id_file_name):
-        with open(id_file_name) as id_file:
+        with open(id_file_name, 'w') as id_file:
             for test_id in test_ids:
                 id_file.write("{}\n".format(test_id))
 
