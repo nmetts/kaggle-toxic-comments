@@ -256,7 +256,6 @@ def cross_validate(train_file, labels_file, classifiers):
     train_data, test_data = train_test_split(data, test_size=0.2)
     train_labels = train_data[LABEL_COLUMNS].as_matrix()
     test_labels = test_data[LABEL_COLUMNS].as_matrix()
-
     train_data.drop(LABEL_COLUMNS, axis=1, inplace=True)
     test_data.drop(LABEL_COLUMNS, axis=1, inplace=True)
     clf_list = get_classifiers(classifiers)
@@ -268,9 +267,7 @@ def cross_validate(train_file, labels_file, classifiers):
         print("Making predictions")
         predictions = np.array(clf.predict_proba(test_data))
         p_shape = predictions.shape
-        if len(p_shape) == 2:
-            predictions = predictions.reshape(p_shape[1], p_shape[0])
-        else:
+        if len(p_shape) == 3:
             predictions = predictions.reshape(p_shape[1], p_shape[0], p_shape[2])
             predictions = predictions[:, :, 1]
         print("Calculating log loss")
