@@ -81,7 +81,10 @@ def get_num_words(row_str):
 
 
 def get_mean_word_length(row_str):
-    return len(row_str.replace(" ", ""))/len(row_str.split())
+    if len(row_str.split()) == 0:
+        return 0
+    else:
+        return len(row_str.replace(" ", ""))/len(row_str.split())
 
 
 def get_unique_words(row_str):
