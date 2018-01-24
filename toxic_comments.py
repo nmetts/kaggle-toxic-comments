@@ -194,7 +194,7 @@ def create_feature_files(train_data, test_data, features):
     test_matrix = hstack((test_matrix, test_features[additional_columns]))
 
     # Need the IDs for the test file
-    test_matrix = test_matrix.assign(id=test_df.id)
+    test_matrix['id'] = test_df.id
     train_path = os.path.dirname(train_data)
     test_path = os.path.dirname(test_data)
     new_train_name = train_path + os.path.sep + \
@@ -203,9 +203,11 @@ def create_feature_files(train_data, test_data, features):
                     (os.path.basename(test_data).split('.csv')[0] + "_".join(features) + ".csv")
 
     print("Writing train matrix to file")
-    train_matrix.to_csv(new_train_name, index=False, index_label=False)
+    #train_matrix.to_csv(new_train_name, index=False, index_label=False)
+    np.savetxt(new_train_name, train_matrix, delimiter=",")
     print("Writing test matrix to file")
-    test_matrix.to_csv(new_test_name, index=False, index_label=False)
+    #test_matrix.to_csv(new_test_name, index=False, index_label=False)
+    np.savetxt(new_test_name, test_matrix, delimiter=",")
 
 
 def get_classifiers(clf_names):
