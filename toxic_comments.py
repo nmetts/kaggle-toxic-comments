@@ -205,9 +205,11 @@ def create_feature_files(train_data, test_data, features):
                     (os.path.basename(test_data).split('.csv')[0] + "_".join(features) + ".csv")
 
     print("Writing train matrix to file")
-    np.savetxt(new_train_name, train_matrix, delimiter=",")
+    np.savez(new_train_name, data=train_matrix.data, indices=train_matrix.indices,
+             indptr=train_matrix.indptr, shape=train_matrix.shape)
     print("Writing test matrix to file")
-    np.savetxt(new_test_name, test_matrix, delimiter=",")
+    np.savez(new_test_name, data=test_matrix.data, indices=test_matrix.indices,
+             indptr=test_matrix.indptr, shape=test_matrix.shape)
 
 
 def get_classifiers(clf_names):
