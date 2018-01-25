@@ -8,6 +8,7 @@ Created on January 18, 2018
 
 import argparse
 import csv
+import datetime as dt
 import os
 import re
 import sys
@@ -18,6 +19,7 @@ from mlxtend.classifier import StackingClassifier
 from nltk.stem import WordNetLemmatizer
 from scipy.sparse import csc_matrix, hstack
 from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
+from sklearn.externals import joblib
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import log_loss
 from sklearn.model_selection import train_test_split
@@ -147,6 +149,19 @@ def get_features(df, features):
     return df
 
 
+def persist_model(clf):
+    """
+    A convenience function for persisting a trained model to disk.
+
+    Params:
+        clf(sklearn.base.BaseEstimator): A trained (fitted) estimator
+    """
+    dt_str = dt.datetime.now().strftime('%m_%d_%Y_%H')
+    print("Saving model: {}".format(clf.__class__.__name__))
+    pickle_file_name = '{}_{}.pkl'.format(clf.__class__.__name__, dt_str)
+    joblib.dump(clf, pickle_file_name)
+
+
 def create_feature_files(train_data, test_data, features):
     """
     A function to create CSV files that can be used to directly predict or cross-validate,
@@ -230,7 +245,7 @@ def get_classifiers(clf_names):
     if RANDOM_FOREST in clf_names:
         clf_list.append(RandomForestClassifier(n_jobs=-1, n_estimators=400, class_weight='balanced'))
     if MLP in clf_names:
-        clf_list.append(MLPClassifier(hidden_layer_sizes=(500, 200, 100)))
+        clf_list.append(MLPClassifier(hidden_layer_sizes=(200, 100, 50), verbose=True, max_iter=1000))
     if EXTRA_TREES in clf_names:
         clf_list.append(ExtraTreesClassifier(n_jobs=-1, n_estimators=400, class_weight='balanced'))
     if STACKING in clf_names:
@@ -242,7 +257,7 @@ def get_classifiers(clf_names):
     return clf_list
 
 
-def predict(train_file, labels_file, test_file, id_file, classifiers):
+def predict(train_file, labels_file, test_file, id_file, classifiers, save_model):
     """
     A function to make predictions and write them to file. All parameters are required.
 
@@ -265,6 +280,8 @@ def predict(train_file, labels_file, test_file, id_file, classifiers):
         print("Using classifier: {}".format(clf))
         print("Fitting to train data")
         clf.fit(X=train_data, y=labels_mat)
+        if save_model:
+            persist_model(clf)
         print("Making predictions")
         predictions = np.array(clf.predict_proba(test_data))
         p_shape = predictions.shape
@@ -297,7 +314,7 @@ def get_mean_log_loss(y_true, y_pred):
                     for col_idx in range(y_true.shape[1])])
 
 
-def cross_validate(train_file, labels_file, classifiers):
+def cross_validate(train_file, labels_file, classifiers, save_model):
     """
     A function to perform cross-validation
 
@@ -323,6 +340,8 @@ def cross_validate(train_file, labels_file, classifiers):
         print("Using classifier: {}".format(clf.__class__.__name__))
         print("Fitting to train data")
         clf.fit(X=train_data, y=train_labels)
+        if save_model:
+            persist_model(clf=clf)
         print("Making predictions")
         predictions = np.array(clf.predict_proba(test_data))
         p_shape = predictions.shape
@@ -342,14 +361,16 @@ if __name__ == '__main__':
     argparser.add_argument('--id_file', type=str, help='Name of the id file. Required for predictions')
     argparser.add_argument('--features', nargs='+', help='The features to be used')
     argparser.add_argument('--classifiers', nargs='+', help='The features to be used')
+    argparser.add_argument('--save_model', action='store_true', help='Whether the model should be saved')
     argparser.add_argument('--action', type=str, help='Name of the action to take',
                            choices=[CREATE_FEATURE_FILES, CROSS_VALIDATE, PREDICT_TEST])
     args = argparser.parse_args()
 
     if args.action == CROSS_VALIDATE:
-        cross_validate(train_file=args.train_file, labels_file=args.labels_file, classifiers=args.classifiers)
+        cross_validate(train_file=args.train_file, labels_file=args.labels_file, classifiers=args.classifiers,
+                       save_model=args.save_model)
     elif args.action == CREATE_FEATURE_FILES:
         create_feature_files(train_data=args.train_file, test_data=args.test_file, features=args.features)
     elif args.action == PREDICT_TEST:
         predict(train_file=args.train_file, test_file=args.test_file, labels_file=args.labels_file,
-                id_file=args.id_file, classifiers=args.classifiers)
+                id_file=args.id_file, classifiers=args.classifiers, save_model=args.save_model)
