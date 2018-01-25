@@ -18,7 +18,6 @@ from nltk.stem import WordNetLemmatizer
 from scipy.sparse import csc_matrix, hstack
 from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import SGDClassifier
 from sklearn.metrics import log_loss
 from sklearn.model_selection import train_test_split
 from sklearn.neural_network import MLPClassifier
@@ -46,7 +45,6 @@ UNIQUE_WORDS = 'num_unique_words'
 ADDITIONAL_COLUMN_FEATURES = [SPECIAL_CHARACTER_COUNT, NUM_WORDS, MEAN_WORD_LENGTH, UNIQUE_WORDS]
 
 # Classifiers
-SGD = 'sgd'
 RANDOM_FOREST = 'random_forest'
 EXTRA_TREES = 'extra_trees'
 MLP = 'mlp'
@@ -228,8 +226,6 @@ def get_classifiers(clf_names):
     """
     clf_list = []
 
-    if SGD in clf_names:
-        clf_list.append(SGDClassifier(n_jobs=-1, penalty='elasticnet', loss='log', class_weight='balanced'))
     if RANDOM_FOREST in clf_names:
         clf_list.append(RandomForestClassifier(n_jobs=-1, n_estimators=400, class_weight='balanced'))
     if MLP in clf_names:
