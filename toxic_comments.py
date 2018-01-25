@@ -257,7 +257,7 @@ def predict(train_file, labels_file, test_file, id_file, classifiers):
     loader = np.load(test_file)
     test_data = csc_matrix((loader['data'], loader['indices'], loader['indptr']), shape=loader['shape'])
     labels_mat = pd.read_csv(labels_file).as_matrix()
-    ids = np.loadtxt(id_file)
+    ids = pd.read_csv(id_file).id.values
 
     clf_list = get_classifiers(classifiers)
 
