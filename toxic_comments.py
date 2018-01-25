@@ -53,37 +53,79 @@ EXTRA_TREES = 'extra_trees'
 MLP = 'mlp'
 STACKING = 'stacking'
 
-row_index = 0
+# Functions to be applied to DataFrame columns
 
 
 def correct_spelling(row_str):
+    """
+    A function to correct the spelling of a document.
+
+    Params:
+        row_str(str): The document to be corrected.
+    """
     return str(TextBlob(row_str).correct())
 
 
 def pos_replace(row_str):
+    """
+    A function to replace the words in a document with their part of speech (POS) tag.
+
+    Params:
+        row_str(str): The document to be transformed
+    """
     tags = TextBlob(row_str).tags
     tag_replace = ['CC', 'CD', 'DT', 'IN', 'NN', 'NNP', 'NNS', 'PRP', 'PRP$', 'WP']
     return " ".join([x[1] if x[1] in tag_replace else x[0] for x in tags])
 
 
 def get_sentiment_analysis(row_str):
+    """
+    A function to obtain the sentiment analysis (polarity and subjectivity) of a document.
+
+    Params:
+        row_str(str): The document for which to obtain sentiment analysis.
+    """
     blob = TextBlob(row_str)
     return blob.sentiment.polarity, blob.sentiment.subjectivity
 
 
 def get_polarity(row):
+    """
+    Get the polarity from the tuple of (polarity, subjectivity) resulting from sentiment analysis.
+
+    Params:
+        row(tuple): The row containing subjectivity and polarity.
+    """
     return row[0]
 
 
 def get_subjectivity(row):
+    """
+    Get the subjectivity from the tuple of (subjectivity, polarity) resulting from sentiment analysis.
+
+    Params:
+        row(tuple): The row containing subjectivity and polarity.
+    """
     return row[1]
 
 
 def get_num_words(row_str):
+    """
+    A function to obtain the number of words in a document.
+
+    Params:
+        row_str(str): The document
+    """
     return len(row_str.split())
 
 
 def get_mean_word_length(row_str):
+    """
+    A function to obtain the mean word length of a document.
+
+    Params:
+        row_str(str): The document
+    """
     if len(row_str.split()) == 0:
         return 0
     else:
@@ -91,14 +133,30 @@ def get_mean_word_length(row_str):
 
 
 def get_unique_words(row_str):
+    """
+    A function to obtain the number of unique words in a document.
+
+    Params;
+        row_str(str): The document
+    """
     return len(set(row_str.split()))
 
 
 def get_special_character_count(row_str):
+    """
+    A function to get the number of special characters in a document.
+    Params:
+    row_str(str): The document
+    """
     return len(re.sub(r"\w", "", row_str.replace(" ", "")))
 
 
 def remove_punctuation(row_str):
+    """
+    A function to remove the punctuation from a document
+    Params:
+        row_str(str): The document to be transformed.
+    """
     try:
         global row_index
         row_index += 1
@@ -111,11 +169,24 @@ def remove_punctuation(row_str):
 
 
 def lemmatize(row_str):
+    """
+    A function to lemmatize the words in a document.
+
+    Params:
+        row_str(str): The document to be lemmatized
+    """
     wnl = WordNetLemmatizer()
     return " ".join([wnl.lemmatize(x) for x in row_str.split()])
 
 
 def get_features(df, features):
+    """
+    A function to obtain all the features when creating a feature file.
+
+    Params:
+        df(pandas.DataFrame): The DataFrame to be used in feature generation.
+        features(list): A list of features to be obtained
+    """
     if not features:
         return df
     if REMOVE_PUNCTUATION in features:
@@ -257,51 +328,89 @@ def get_classifiers(clf_names):
     return clf_list
 
 
-def predict(train_file, labels_file, test_file, id_file, classifiers, save_model):
+def write_predictions_to_file(preds_file_name, ids, predictions):
     """
-    A function to make predictions and write them to file. All parameters are required.
+    A convenience function for writing predictions to file.
+
+    Params:
+        preds_file_name(str): The name of the predictions file.
+        ids(list or numpy.array): An iterable containing prediction ids
+        predictions(numpy.array): An array of shape (num_predictions, num_classes) containing predictions
+    """
+    print("Writing predictions to file")
+    with open(preds_file_name, 'w') as preds_file:
+        writer = csv.writer(preds_file)
+        header_row = ['id'] + LABEL_COLUMNS
+        writer.writerow(header_row)
+        for row_id, preds in zip(ids, predictions):
+            row = [row_id] + list(preds)
+            writer.writerow(row)
+
+
+def get_predictions(clf, test_data):
+    """
+    Convenience function for getting predictions.
+
+    Params:
+        clf(sklearn.BaseEstimator): A fitted (trained) estimator used to make predictions
+        test_data(np.array or scipy.sparse.csc_matrix): The test data used for predictions
+    """
+    print("Making predictions")
+    predictions = np.array(clf.predict_proba(test_data))
+    p_shape = predictions.shape
+    if len(p_shape) == 3:
+        predictions = predictions.reshape(p_shape[1], p_shape[0], p_shape[2])
+        predictions = predictions[:, :, 1]
+    return predictions
+
+
+def predict(train_file, labels_file, test_file, id_file, classifiers, save_model=False, use_model=None):
+    """
+    A function to make predictions and write them to file. If using a saved model, the train_file is not required,
+    and neither is labels_file.
 
     Params:
         train_file(str): The name of the train file
         labels_file(str): The name of the labels file
         test_file(str): The name of the test file
+        id_file(str): The name of a file containing ids for making predictions
         classifiers(list): A list of classifier names
+        save_model(bool): Indicates whether the trained model should be persisted to disk.
+        use_model(bool): Indicates whether a pre-trained model should be used. If so, classifiers is not used.
     """
-    loader = np.load(train_file)
-    train_data = csc_matrix((loader['data'], loader['indices'], loader['indptr']), shape=loader['shape'])
-    loader = np.load(test_file)
-    test_data = csc_matrix((loader['data'], loader['indices'], loader['indptr']), shape=loader['shape'])
-    labels_mat = pd.read_csv(labels_file).as_matrix()
-    ids = pd.read_csv(id_file).id.values
-
-    clf_list = get_classifiers(classifiers)
-
-    for clf in clf_list:
-        print("Using classifier: {}".format(clf))
-        print("Fitting to train data")
-        clf.fit(X=train_data, y=labels_mat)
-        if save_model:
-            persist_model(clf)
-        print("Making predictions")
-        predictions = np.array(clf.predict_proba(test_data))
-        p_shape = predictions.shape
-        predictions = predictions.reshape(p_shape[1], p_shape[0], p_shape[2])
-        predictions = predictions[:, :, 1]
+    if use_model:
+        clf = joblib.load(use_model)
+        loader = np.load(test_file)
+        test_data = csc_matrix((loader['data'], loader['indices'], loader['indptr']), shape=loader['shape'])
+        ids = pd.read_csv(id_file).id.values
+        predictions = get_predictions(clf=clf, test_data=test_data)
         preds_file_name = os.path.dirname(test_file) + os.path.sep + clf.__class__.__name__ + "_predictions.csv"
+        write_predictions_to_file(preds_file_name=preds_file_name, ids=ids, predictions=predictions)
 
-        print("Writing predictions to file")
-        with open(preds_file_name, 'w') as preds_file:
-            writer = csv.writer(preds_file)
-            header_row = ['id'] + LABEL_COLUMNS
-            writer.writerow(header_row)
-            for row_id, preds in zip(ids, predictions):
-                row = [row_id] + list(preds)
-                writer.writerow(row)
+    else:
+        loader = np.load(train_file)
+        train_data = csc_matrix((loader['data'], loader['indices'], loader['indptr']), shape=loader['shape'])
+        loader = np.load(test_file)
+        test_data = csc_matrix((loader['data'], loader['indices'], loader['indptr']), shape=loader['shape'])
+        labels_mat = pd.read_csv(labels_file).as_matrix()
+        ids = pd.read_csv(id_file).id.values
+
+        clf_list = get_classifiers(classifiers)
+
+        for clf in clf_list:
+            print("Using classifier: {}".format(clf))
+            print("Fitting to train data")
+            clf.fit(X=train_data, y=labels_mat)
+            if save_model:
+                persist_model(clf)
+            predictions = get_predictions(clf=clf, test_data=test_data)
+            preds_file_name = os.path.dirname(test_file) + os.path.sep + clf.__class__.__name__ + "_predictions.csv"
+            write_predictions_to_file(preds_file_name=preds_file_name, ids=ids, predictions=predictions)
 
 
 def get_mean_log_loss(y_true, y_pred):
     """
-    A function to calculate the mean log loss across columns
+    A function to calculate the mean log loss across columns.
 
     Params:
         y_true(numpy.array):  The Numpy array of true labels
@@ -309,6 +418,10 @@ def get_mean_log_loss(y_true, y_pred):
 
     Throws AssertionError if y_true.shape != y_pred.shape
     """
+    p_shape = y_pred.shape
+    if len(p_shape) == 3:
+        y_pred = y_pred.reshape(p_shape[1], p_shape[0], p_shape[2])
+        y_pred = y_pred[:, :, 1]
     assert (y_true.shape == y_pred.shape)
     return np.mean([log_loss(y_true=y_true[..., col_idx], y_pred=y_pred[..., col_idx])
                     for col_idx in range(y_true.shape[1])])
@@ -344,10 +457,6 @@ def cross_validate(train_file, labels_file, classifiers, save_model):
             persist_model(clf=clf)
         print("Making predictions")
         predictions = np.array(clf.predict_proba(test_data))
-        p_shape = predictions.shape
-        if len(p_shape) == 3:
-            predictions = predictions.reshape(p_shape[1], p_shape[0], p_shape[2])
-            predictions = predictions[:, :, 1]
         print("Calculating log loss")
         loss = get_mean_log_loss(y_true=test_labels, y_pred=predictions)
         print("Loss is: {}".format(loss))
@@ -362,6 +471,7 @@ if __name__ == '__main__':
     argparser.add_argument('--features', nargs='+', help='The features to be used')
     argparser.add_argument('--classifiers', nargs='+', help='The features to be used')
     argparser.add_argument('--save_model', action='store_true', help='Whether the model should be saved')
+    argparser.add_argument('--use_model', type='str', help='The path to a saved model')
     argparser.add_argument('--action', type=str, help='Name of the action to take',
                            choices=[CREATE_FEATURE_FILES, CROSS_VALIDATE, PREDICT_TEST])
     args = argparser.parse_args()
@@ -373,4 +483,5 @@ if __name__ == '__main__':
         create_feature_files(train_data=args.train_file, test_data=args.test_file, features=args.features)
     elif args.action == PREDICT_TEST:
         predict(train_file=args.train_file, test_file=args.test_file, labels_file=args.labels_file,
-                id_file=args.id_file, classifiers=args.classifiers, save_model=args.save_model)
+                id_file=args.id_file, classifiers=args.classifiers, save_model=args.save_model,
+                use_model=args.use_model)
