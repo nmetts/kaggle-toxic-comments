@@ -19,7 +19,6 @@ from nltk.stem import WordNetLemmatizer
 from scipy.sparse import csc_matrix, hstack
 from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import LogisticRegressionCV
 from sklearn.metrics import log_loss
 from sklearn.model_selection import train_test_split
 from sklearn.neural_network import MLPClassifier
@@ -48,7 +47,6 @@ ADDITIONAL_COLUMN_FEATURES = [SPECIAL_CHARACTER_COUNT, NUM_WORDS, MEAN_WORD_LENG
 
 # Classifiers
 RANDOM_FOREST = 'random_forest'
-LOGISTIC_REGRESSION = 'logistic_regression'
 EXTRA_TREES = 'extra_trees'
 MLP = 'mlp'
 STACKING = 'stacking'
@@ -229,9 +227,6 @@ def get_classifiers(clf_names):
     """
     clf_list = []
 
-    if LOGISTIC_REGRESSION in clf_names:
-        clf_list.append(LogisticRegressionCV(n_jobs=-1, solver='newton-cg', scoring=log_loss, penalty='l2',
-                                             class_weight='balanced', multi_class='multinomial'))
     if RANDOM_FOREST in clf_names:
         clf_list.append(RandomForestClassifier(n_jobs=-1, n_estimators=400, class_weight='balanced'))
     if MLP in clf_names:
