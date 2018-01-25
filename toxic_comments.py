@@ -10,6 +10,7 @@ import argparse
 import csv
 import os
 import re
+import sys
 
 import numpy as np
 import pandas as pd
@@ -18,6 +19,7 @@ from nltk.stem import WordNetLemmatizer
 from scipy.sparse import csc_matrix, hstack
 from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegressionCV
 from sklearn.metrics import log_loss
 from sklearn.model_selection import train_test_split
 from sklearn.neural_network import MLPClassifier
@@ -46,6 +48,7 @@ ADDITIONAL_COLUMN_FEATURES = [SPECIAL_CHARACTER_COUNT, NUM_WORDS, MEAN_WORD_LENG
 
 # Classifiers
 RANDOM_FOREST = 'random_forest'
+LOGISTIC_REGRESSION = 'logistic_regression'
 EXTRA_TREES = 'extra_trees'
 MLP = 'mlp'
 STACKING = 'stacking'
@@ -200,11 +203,11 @@ def create_feature_files(train_data, test_data, features):
     train_path = os.path.dirname(train_data)
     test_path = os.path.dirname(test_data)
     new_train_name = "{}_{}{}{}.csv".format(train_path, os.path.sep,
-                                           os.path.basename(train_data).split('.csv')[0],
-                                           "_".join(features))
+                                            os.path.basename(train_data).split('.csv')[0],
+                                            "_".join(features))
     new_test_name = "{}_{}{}{}.csv".format(test_path, os.path.sep,
-                                          os.path.basename(test_data).split('.csv')[0],
-                                          "_".join(features))
+                                           os.path.basename(test_data).split('.csv')[0],
+                                           "_".join(features))
 
     print("Writing train matrix to file")
     np.savez(new_train_name, data=train_matrix.data, indices=train_matrix.indices,
@@ -226,6 +229,9 @@ def get_classifiers(clf_names):
     """
     clf_list = []
 
+    if LOGISTIC_REGRESSION in clf_names:
+        clf_list.append(LogisticRegressionCV(n_jobs=-1, solver='newton-cg', scoring=log_loss, penalty='l2',
+                                             class_weight='balanced', multi_class='multinomial'))
     if RANDOM_FOREST in clf_names:
         clf_list.append(RandomForestClassifier(n_jobs=-1, n_estimators=400, class_weight='balanced'))
     if MLP in clf_names:
@@ -233,7 +239,9 @@ def get_classifiers(clf_names):
     if EXTRA_TREES in clf_names:
         clf_list.append(ExtraTreesClassifier(n_jobs=-1, n_estimators=400, class_weight='balanced'))
     if STACKING in clf_names:
-        meta_clf = RandomForestClassifier(n_jobs=-1, n_estimators=400)
+        # See if we can avoid hitting the recursion limit
+        sys.setrecursionlimit(2000)
+        meta_clf = RandomForestClassifier(n_jobs=-1, n_estimators=400, class_weight='balanced')
         clf = StackingClassifier(classifiers=clf_list, meta_classifier=meta_clf, use_probas=True)
         clf_list.append(clf)
     return clf_list
@@ -249,9 +257,11 @@ def predict(train_file, labels_file, test_file, id_file, classifiers):
         test_file(str): The name of the test file
         classifiers(list): A list of classifier names
     """
-    train_data = pd.read_csv(train_file)
-    labels_df = pd.read_csv(labels_file)
-    test_data = pd.read_csv(test_file)
+    loader = np.load(train_file)
+    train_data = csc_matrix((loader['data'], loader['indices'], loader['indptr']), shape=loader['shape'])
+    loader = np.load(test_file)
+    test_data = csc_matrix((loader['data'], loader['indices'], loader['indptr']), shape=loader['shape'])
+    labels_mat = pd.read_csv(labels_file).as_matrix()
     ids = np.loadtxt(id_file)
 
     clf_list = get_classifiers(classifiers)
@@ -259,7 +269,7 @@ def predict(train_file, labels_file, test_file, id_file, classifiers):
     for clf in clf_list:
         print("Using classifier: {}".format(clf))
         print("Fitting to train data")
-        clf.fit(X=train_data, y=labels_df)
+        clf.fit(X=train_data, y=labels_mat)
         print("Making predictions")
         predictions = np.array(clf.predict_proba(test_data))
         p_shape = predictions.shape
