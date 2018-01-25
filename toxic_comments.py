@@ -308,8 +308,8 @@ def cross_validate(train_file, labels_file, classifiers):
 
     train_data, test_data = train_test_split(data, test_size=0.2)
     # Separate the labels columns from the train and test features
-    train_labels = train_data[:, -6:]
-    test_labels = test_data[:, -6:]
+    train_labels = (train_data[:, -6:]).toarray()
+    test_labels = (test_data[:, -6:]).toarray()
     train_data = train_data[:, :-6]
     test_data = test_data[:, :-6]
     clf_list = get_classifiers(classifiers)
