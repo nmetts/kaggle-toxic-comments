@@ -24,6 +24,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import log_loss
 from sklearn.model_selection import train_test_split
 from sklearn.neural_network import MLPClassifier
+from sklearn.preprocessing import Normalizer
 from textblob import TextBlob
 
 # Name of label columns
@@ -253,10 +254,10 @@ def create_feature_files(train_data, test_data, features):
 
     train_path = os.path.dirname(train_data)
     test_path = os.path.dirname(test_data)
-    new_train_name = "{}_{}{}{}.csv".format(train_path, os.path.sep,
+    new_train_name = "{}{}{}_{}.csv".format(train_path, os.path.sep,
                                             os.path.basename(train_data).split('.csv')[0],
                                             "_".join(features))
-    new_test_name = "{}_{}{}{}.csv".format(test_path, os.path.sep,
+    new_test_name = "{}{}{}_{}.csv".format(test_path, os.path.sep,
                                            os.path.basename(test_data).split('.csv')[0],
                                            "_".join(features))
 
@@ -486,6 +487,8 @@ def cross_validate(train_file, labels_file, file_type, classifiers, save_model):
     for clf in clf_list:
         print("Using classifier: {}".format(clf.__class__.__name__))
         print("Fitting to train data")
+        if clf == MLP:
+            normalizer = Normalizer()
         clf.fit(X=train_data, y=train_labels)
         if save_model:
             persist_model(clf=clf)
