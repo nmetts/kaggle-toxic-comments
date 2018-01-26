@@ -24,7 +24,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import log_loss
 from sklearn.model_selection import train_test_split
 from sklearn.neural_network import MLPClassifier
-from sklearn.preprocessing import Normalizer
+from sklearn.preprocessing import StandardScaler
 from textblob import TextBlob
 
 # Name of label columns
@@ -375,7 +375,7 @@ def get_predictions(clf, test_data):
 
 
 def predict(train_file, labels_file, test_file, id_file, file_type,
-            classifiers, save_model=False, use_model=None):
+            classifiers, save_model=False, use_model=None, scale=False):
     """
     A function to make predictions and write them to file. If using a saved model, the train_file is not required,
     and neither is labels_file.
@@ -416,6 +416,14 @@ def predict(train_file, labels_file, test_file, id_file, file_type,
 
         for clf in clf_list:
             print("Using classifier: {}".format(clf))
+            if clf == MLP or scale:
+                print("Fitting scaler")
+                scaler = StandardScaler()
+                scaler.fit(train_data)
+                print("Transforming train data")
+                train_data = scaler.transform(train_data)
+                print("Transforming test data")
+                test_data = scaler.transform(test_data)
             print("Fitting to train data")
             clf.fit(X=train_data, y=labels_mat)
             if save_model:
@@ -446,7 +454,7 @@ def get_mean_log_loss(y_true, y_pred):
                     for col_idx in range(y_true.shape[1])])
 
 
-def cross_validate(train_file, labels_file, file_type, classifiers, save_model):
+def cross_validate(train_file, labels_file, file_type, classifiers, save_model, scale=False):
     """
     A function to perform cross-validation
 
@@ -487,8 +495,14 @@ def cross_validate(train_file, labels_file, file_type, classifiers, save_model):
     for clf in clf_list:
         print("Using classifier: {}".format(clf.__class__.__name__))
         print("Fitting to train data")
-        if clf == MLP:
-            normalizer = Normalizer()
+        if clf == MLP or scale:
+            print("Fitting scaler")
+            scaler = StandardScaler()
+            scaler.fit(train_data)
+            print("Transforming train data")
+            train_data = scaler.transform(train_data)
+            print("Transforming test data")
+            test_data = scaler.transform(test_data)
         clf.fit(X=train_data, y=train_labels)
         if save_model:
             persist_model(clf=clf)
@@ -511,16 +525,17 @@ if __name__ == '__main__':
     argparser.add_argument('--classifiers', nargs='+', help='The features to be used')
     argparser.add_argument('--save_model', action='store_true', help='Whether the model should be saved')
     argparser.add_argument('--use_model', help='The path to a saved model')
+    argparser.add_argument('--scale', action='store_true', help='Whether data should be scaled')
     argparser.add_argument('--action', help='Name of the action to take',
                            choices=[CREATE_FEATURE_FILES, CROSS_VALIDATE, PREDICT_TEST])
     args = argparser.parse_args()
 
     if args.action == CROSS_VALIDATE:
         cross_validate(train_file=args.train_file, labels_file=args.labels_file, file_type=args.file_type,
-                       classifiers=args.classifiers, save_model=args.save_model)
+                       classifiers=args.classifiers, save_model=args.save_model, scale=args.scale)
     elif args.action == CREATE_FEATURE_FILES:
         create_feature_files(train_data=args.train_file, test_data=args.test_file, features=args.features)
     elif args.action == PREDICT_TEST:
         predict(train_file=args.train_file, test_file=args.test_file, labels_file=args.labels_file,
                 id_file=args.id_file, file_type=args.file_type, classifiers=args.classifiers,
-                save_model=args.save_model, use_model=args.use_model)
+                save_model=args.save_model, use_model=args.use_model, scale=args.scale)
