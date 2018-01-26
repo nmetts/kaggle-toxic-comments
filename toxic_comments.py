@@ -300,6 +300,9 @@ def create_feature_files(train_data, test_data, features):
         train_matrix = hstack((train_matrix, train_features[additional_columns]), format='csc')
         test_matrix = hstack((test_matrix, test_features[additional_columns]), format='csc')
 
+        # Remove the .csv extension if saving in npz format
+        new_train_name = new_train_name.split(".csv")[0]
+        new_test_name = new_test_name.split(".csv")[0]
         print("Writing train matrix to file")
         np.savez(new_train_name, data=train_matrix.data, indices=train_matrix.indices,
                  indptr=train_matrix.indptr, shape=train_matrix.shape)
