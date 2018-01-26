@@ -29,12 +29,17 @@ from textblob import TextBlob
 # Name of label columns
 LABEL_COLUMNS = ['toxic', 'severe_toxic', 'obscene', 'threat', 'insult', 'identity_hate']
 
+# File types
+DF = 'df'
+NPZ = 'npz'
+
 # Actions
 CREATE_FEATURE_FILES = 'create_feature_files'
 CROSS_VALIDATE = 'cross_validate'
 PREDICT_TEST = 'predict_test'
 
 # Features
+TF_IDF = 'tf_idf'
 LEMMATIZE = 'lemmatize'
 SENTIMENT = 'sentiment'
 CORRECT_SPELLING = 'correct_spelling'
@@ -267,22 +272,26 @@ def create_feature_files(train_data, test_data, features):
     print("Getting features for test data")
     test_features = get_features(test_df, features)
 
-    vectorizer = TfidfVectorizer()
-    print("Fitting and transforming train data")
-    train_matrix = vectorizer.fit_transform(train_features.comment_text)
-    print("Transforming test data")
-    test_matrix = vectorizer.transform(test_features.comment_text)
+    if TF_IDF in features:
+        vectorizer = TfidfVectorizer()
+        print("Fitting and transforming train data")
+        train_matrix = vectorizer.fit_transform(train_features.comment_text)
+        print("Transforming test data")
+        test_matrix = vectorizer.transform(test_features.comment_text)
 
-    if 'subjectivity' in train_features.columns and 'polarity' in train_features.columns:
-        print("Adding polarity and subjectivity to train matrix")
-        train_matrix = hstack((train_matrix, train_features[['subjectivity', 'polarity']]))
+        if 'subjectivity' in train_features.columns and 'polarity' in train_features.columns:
+            print("Adding polarity and subjectivity to train matrix")
+            train_matrix = hstack((train_matrix, train_features[['subjectivity', 'polarity']]))
 
-        print("Adding polarity and subjectivity to test matrix")
-        test_matrix = hstack((test_matrix, test_features[['subjectivity', 'polarity']]))
+            print("Adding polarity and subjectivity to test matrix")
+            test_matrix = hstack((test_matrix, test_features[['subjectivity', 'polarity']]))
 
-    additional_columns = [x for x in train_features.columns if x in ADDITIONAL_COLUMN_FEATURES]
-    train_matrix = hstack((train_matrix, train_features[additional_columns]), format='csc')
-    test_matrix = hstack((test_matrix, test_features[additional_columns]), format='csc')
+        additional_columns = [x for x in train_features.columns if x in ADDITIONAL_COLUMN_FEATURES]
+        train_matrix = hstack((train_matrix, train_features[additional_columns]), format='csc')
+        test_matrix = hstack((test_matrix, test_features[additional_columns]), format='csc')
+    else:
+        train_matrix = train_features.as_matrix()
+        test_matrix = test_features.as_matrix()
 
     train_path = os.path.dirname(train_data)
     test_path = os.path.dirname(test_data)
@@ -364,7 +373,8 @@ def get_predictions(clf, test_data):
     return predictions
 
 
-def predict(train_file, labels_file, test_file, id_file, classifiers, save_model=False, use_model=None):
+def predict(train_file, labels_file, test_file, id_file, file_type,
+            classifiers, save_model=False, use_model=None):
     """
     A function to make predictions and write them to file. If using a saved model, the train_file is not required,
     and neither is labels_file.
@@ -374,6 +384,7 @@ def predict(train_file, labels_file, test_file, id_file, classifiers, save_model
         labels_file(str): The name of the labels file
         test_file(str): The name of the test file
         id_file(str): The name of a file containing ids for making predictions
+        file_type(str): Indicates the file type. Either Pandas DataFrame or scipy.sparse.csc_matrix
         classifiers(list): A list of classifier names
         save_model(bool): Indicates whether the trained model should be persisted to disk.
         use_model(bool): Indicates whether a pre-trained model should be used. If so, classifiers is not used.
@@ -388,12 +399,17 @@ def predict(train_file, labels_file, test_file, id_file, classifiers, save_model
         write_predictions_to_file(preds_file_name=preds_file_name, ids=ids, predictions=predictions)
 
     else:
-        loader = np.load(train_file)
-        train_data = csc_matrix((loader['data'], loader['indices'], loader['indptr']), shape=loader['shape'])
-        loader = np.load(test_file)
-        test_data = csc_matrix((loader['data'], loader['indices'], loader['indptr']), shape=loader['shape'])
-        labels_mat = pd.read_csv(labels_file).as_matrix()
         ids = pd.read_csv(id_file).id.values
+        if file_type == NPZ:
+            loader = np.load(train_file)
+            train_data = csc_matrix((loader['data'], loader['indices'], loader['indptr']), shape=loader['shape'])
+            loader = np.load(test_file)
+            test_data = csc_matrix((loader['data'], loader['indices'], loader['indptr']), shape=loader['shape'])
+            labels_mat = pd.read_csv(labels_file).as_matrix()
+
+        else:
+            train_data = pd.read_csv(train_file)
+            labels_mat = pd.read_csv(labels_file).as_matrix()
 
         clf_list = get_classifiers(classifiers)
 
@@ -419,6 +435,8 @@ def get_mean_log_loss(y_true, y_pred):
     Throws AssertionError if y_true.shape != y_pred.shape
     """
     p_shape = y_pred.shape
+
+    # Need to reshape predictions array for some classifiers.
     if len(p_shape) == 3:
         y_pred = y_pred.reshape(p_shape[1], p_shape[0], p_shape[2])
         y_pred = y_pred[:, :, 1]
@@ -427,26 +445,42 @@ def get_mean_log_loss(y_true, y_pred):
                     for col_idx in range(y_true.shape[1])])
 
 
-def cross_validate(train_file, labels_file, classifiers, save_model):
+def cross_validate(train_file, labels_file, file_type, classifiers, save_model):
     """
     A function to perform cross-validation
 
     Params:
         train_file(str): The name of the train file. Expected to be a CSV file transformed and ready for fitting.
         labels_file(str): The name of the file with labels
+        file_type(str): Indicates the file type. Either Pandas DataFrame or scipy.sparse.csc_matrix
         classifiers(list): A list of classifiers to be used in cross-validation
+        save_model(bool): Indicates whether the fitted model should be saved to disk.
     """
-    loader = np.load(train_file)
-    data = csc_matrix((loader['data'], loader['indices'], loader['indptr']), shape=loader['shape'])
-    labels_mat = pd.read_csv(labels_file).as_matrix()
-    data = hstack((data, labels_mat))
+    if file_type == NPZ:
+        loader = np.load(train_file)
+        data = csc_matrix((loader['data'], loader['indices'], loader['indptr']), shape=loader['shape'])
+        labels_mat = pd.read_csv(labels_file).as_matrix()
+        data = hstack((data, labels_mat))
 
-    train_data, test_data = train_test_split(data, test_size=0.2)
-    # Separate the labels columns from the train and test features
-    train_labels = (train_data[:, -6:]).toarray()
-    test_labels = (test_data[:, -6:]).toarray()
-    train_data = train_data[:, :-6]
-    test_data = test_data[:, :-6]
+        train_data, test_data = train_test_split(data, test_size=0.2)
+
+        # Separate the labels columns from the train and test features
+        train_labels = (train_data[:, -6:]).toarray()
+        test_labels = (test_data[:, -6:]).toarray()
+        train_data = train_data[:, :-6]
+        test_data = test_data[:, :-6]
+    else:
+        data = pd.read_csv(train_file)
+        labels = pd.read_csv(labels_file)
+        data = data.merge(labels, right_index=True, left_index=True)
+        train_data, test_data = train_test_split(data, test_size=0.2)
+
+        # Separate the labels columns from the train and test features
+        train_labels = (train_data[LABEL_COLUMNS]).as_matrix()
+        test_labels = (test_data[LABEL_COLUMNS]).as_matrix()
+        train_data.drop(LABEL_COLUMNS, axis=1, inplace=True)
+        test_data.drop(LABEL_COLUMNS, axis=1, inplace=True)
+
     clf_list = get_classifiers(classifiers)
 
     for clf in clf_list:
@@ -468,6 +502,8 @@ if __name__ == '__main__':
     argparser.add_argument('--test_file', type=str, help='Name of the test data file')
     argparser.add_argument('--labels_file', type=str, help='Name of the labels file. Required for cross-validation')
     argparser.add_argument('--id_file', type=str, help='Name of the id file. Required for predictions')
+    argparser.add_argument('--file_type', type=str, help='Type of file for train and test data.',
+                           choices=[DF, NPZ], default=NPZ)
     argparser.add_argument('--features', nargs='+', help='The features to be used')
     argparser.add_argument('--classifiers', nargs='+', help='The features to be used')
     argparser.add_argument('--save_model', action='store_true', help='Whether the model should be saved')
@@ -477,11 +513,11 @@ if __name__ == '__main__':
     args = argparser.parse_args()
 
     if args.action == CROSS_VALIDATE:
-        cross_validate(train_file=args.train_file, labels_file=args.labels_file, classifiers=args.classifiers,
-                       save_model=args.save_model)
+        cross_validate(train_file=args.train_file, labels_file=args.labels_file, file_type=args.file_type,
+                       classifiers=args.classifiers, save_model=args.save_model)
     elif args.action == CREATE_FEATURE_FILES:
         create_feature_files(train_data=args.train_file, test_data=args.test_file, features=args.features)
     elif args.action == PREDICT_TEST:
         predict(train_file=args.train_file, test_file=args.test_file, labels_file=args.labels_file,
-                id_file=args.id_file, classifiers=args.classifiers, save_model=args.save_model,
-                use_model=args.use_model)
+                id_file=args.id_file, file_type=args.file_type, classifiers=args.classifiers,
+                save_model=args.save_model, use_model=args.use_model)
