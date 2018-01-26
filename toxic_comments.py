@@ -498,17 +498,17 @@ def cross_validate(train_file, labels_file, file_type, classifiers, save_model):
 
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('--train_file', type=str, help='Name of the train data', required=True)
-    argparser.add_argument('--test_file', type=str, help='Name of the test data file')
-    argparser.add_argument('--labels_file', type=str, help='Name of the labels file. Required for cross-validation')
-    argparser.add_argument('--id_file', type=str, help='Name of the id file. Required for predictions')
-    argparser.add_argument('--file_type', type=str, help='Type of file for train and test data.',
+    argparser.add_argument('--train_file', help='Name of the train data', required=True)
+    argparser.add_argument('--test_file', help='Name of the test data file')
+    argparser.add_argument('--labels_file', help='Name of the labels file. Required for cross-validation')
+    argparser.add_argument('--id_file', help='Name of the id file. Required for predictions')
+    argparser.add_argument('--file_type', help='Type of file for train and test data.',
                            choices=[DF, NPZ], default=NPZ)
     argparser.add_argument('--features', nargs='+', help='The features to be used')
     argparser.add_argument('--classifiers', nargs='+', help='The features to be used')
     argparser.add_argument('--save_model', action='store_true', help='Whether the model should be saved')
-    argparser.add_argument('--use_model', type='str', help='The path to a saved model')
-    argparser.add_argument('--action', type=str, help='Name of the action to take',
+    argparser.add_argument('--use_model', help='The path to a saved model')
+    argparser.add_argument('--action', help='Name of the action to take',
                            choices=[CREATE_FEATURE_FILES, CROSS_VALIDATE, PREDICT_TEST])
     args = argparser.parse_args()
 
