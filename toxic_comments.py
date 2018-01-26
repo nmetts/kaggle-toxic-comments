@@ -251,6 +251,15 @@ def create_feature_files(train_data, test_data, features):
     train_df = pd.read_csv(train_data)
     train_labels = train_df[LABEL_COLUMNS]
 
+    train_path = os.path.dirname(train_data)
+    test_path = os.path.dirname(test_data)
+    new_train_name = "{}_{}{}{}.csv".format(train_path, os.path.sep,
+                                            os.path.basename(train_data).split('.csv')[0],
+                                            "_".join(features))
+    new_test_name = "{}_{}{}{}.csv".format(test_path, os.path.sep,
+                                           os.path.basename(test_data).split('.csv')[0],
+                                           "_".join(features))
+
     # Save the train labels to file if not already saved
     label_file_name = "{}{}train_labels.csv".format(os.path.dirname(train_data), os.path.sep)
     if not os.path.exists(label_file_name):
@@ -289,25 +298,16 @@ def create_feature_files(train_data, test_data, features):
         additional_columns = [x for x in train_features.columns if x in ADDITIONAL_COLUMN_FEATURES]
         train_matrix = hstack((train_matrix, train_features[additional_columns]), format='csc')
         test_matrix = hstack((test_matrix, test_features[additional_columns]), format='csc')
+
+        print("Writing train matrix to file")
+        np.savez(new_train_name, data=train_matrix.data, indices=train_matrix.indices,
+                 indptr=train_matrix.indptr, shape=train_matrix.shape)
+        print("Writing test matrix to file")
+        np.savez(new_test_name, data=test_matrix.data, indices=test_matrix.indices,
+                 indptr=test_matrix.indptr, shape=test_matrix.shape)
     else:
-        train_matrix = train_features.as_matrix()
-        test_matrix = test_features.as_matrix()
-
-    train_path = os.path.dirname(train_data)
-    test_path = os.path.dirname(test_data)
-    new_train_name = "{}_{}{}{}.csv".format(train_path, os.path.sep,
-                                            os.path.basename(train_data).split('.csv')[0],
-                                            "_".join(features))
-    new_test_name = "{}_{}{}{}.csv".format(test_path, os.path.sep,
-                                           os.path.basename(test_data).split('.csv')[0],
-                                           "_".join(features))
-
-    print("Writing train matrix to file")
-    np.savez(new_train_name, data=train_matrix.data, indices=train_matrix.indices,
-             indptr=train_matrix.indptr, shape=train_matrix.shape)
-    print("Writing test matrix to file")
-    np.savez(new_test_name, data=test_matrix.data, indices=test_matrix.indices,
-             indptr=test_matrix.indptr, shape=test_matrix.shape)
+        train_features.to_csv(new_train_name, index=False, index_label=False)
+        test_features.to_csv(new_train_name, index=False, index_label=False)
 
 
 def get_classifiers(clf_names):
