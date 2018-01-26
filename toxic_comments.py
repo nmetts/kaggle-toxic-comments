@@ -417,6 +417,7 @@ def predict(train_file, labels_file, test_file, id_file, file_type,
 
         else:
             train_data = pd.read_csv(train_file)
+            test_data = pd.read_csv(test_file)
             labels_mat = pd.read_csv(labels_file).as_matrix()
 
         clf_list = get_classifiers(classifiers)
