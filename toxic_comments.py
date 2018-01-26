@@ -308,7 +308,7 @@ def create_feature_files(train_data, test_data, features):
                  indptr=test_matrix.indptr, shape=test_matrix.shape)
     else:
         train_features.to_csv(new_train_name, index=False, index_label=False)
-        test_features.to_csv(new_train_name, index=False, index_label=False)
+        test_features.to_csv(new_test_name, index=False, index_label=False)
 
 
 def get_classifiers(clf_names):
