@@ -310,6 +310,8 @@ def create_feature_files(train_data, test_data, features):
         np.savez(new_test_name, data=test_matrix.data, indices=test_matrix.indices,
                  indptr=test_matrix.indptr, shape=test_matrix.shape)
     else:
+        train_features.drop(['comment_text', 'id'], axis=1, inplace=True)
+        test_features.drop(['comment_text', 'id'], axis=1, inplace=True)
         train_features.to_csv(new_train_name, index=False, index_label=False)
         test_features.to_csv(new_test_name, index=False, index_label=False)
 
@@ -419,7 +421,7 @@ def predict(train_file, labels_file, test_file, id_file, file_type,
 
         for clf in clf_list:
             print("Using classifier: {}".format(clf))
-            if clf == MLP or scale:
+            if (clf.__class__.__name__ == MLPClassifier.__class__.__name__) or scale:
                 print("Fitting scaler")
                 scaler = StandardScaler()
                 scaler.fit(train_data)
@@ -498,7 +500,7 @@ def cross_validate(train_file, labels_file, file_type, classifiers, save_model, 
     for clf in clf_list:
         print("Using classifier: {}".format(clf.__class__.__name__))
         print("Fitting to train data")
-        if clf == MLP or scale:
+        if (clf.__class__.__name__ == MLPClassifier.__class__.__name__) or scale:
             print("Fitting scaler")
             scaler = StandardScaler()
             scaler.fit(train_data)
