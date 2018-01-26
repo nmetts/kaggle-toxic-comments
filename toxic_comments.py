@@ -59,6 +59,8 @@ EXTRA_TREES = 'extra_trees'
 MLP = 'mlp'
 STACKING = 'stacking'
 
+MLP_CLASSIFIER_NAME = 'MLPClassifier'
+
 # Functions to be applied to DataFrame columns
 
 
@@ -421,7 +423,7 @@ def predict(train_file, labels_file, test_file, id_file, file_type,
 
         for clf in clf_list:
             print("Using classifier: {}".format(clf))
-            if (clf.__class__.__name__ == MLPClassifier.__class__.__name__) or scale:
+            if (clf.__class__.__name__ == MLP_CLASSIFIER_NAME) or scale:
                 print("Fitting scaler")
                 scaler = StandardScaler()
                 scaler.fit(train_data)
@@ -500,7 +502,7 @@ def cross_validate(train_file, labels_file, file_type, classifiers, save_model, 
     for clf in clf_list:
         print("Using classifier: {}".format(clf.__class__.__name__))
         print("Fitting to train data")
-        if (clf.__class__.__name__ == MLPClassifier.__class__.__name__) or scale:
+        if (clf.__class__.__name__ == MLP_CLASSIFIER_NAME) or scale:
             print("Fitting scaler")
             scaler = StandardScaler()
             scaler.fit(train_data)
