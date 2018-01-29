@@ -339,7 +339,7 @@ def get_classifiers(clf_names):
     if STACKING in clf_names:
         # See if we can avoid hitting the recursion limit
         sys.setrecursionlimit(2000)
-        meta_clf = RandomForestClassifier(n_jobs=-1, n_estimators=400, class_weight='balanced')
+        meta_clf = RandomForestClassifier(n_jobs=-1,  class_weight='balanced')
         clf = StackingClassifier(classifiers=clf_list, meta_classifier=meta_clf, use_probas=True)
         clf_list.append(clf)
     return clf_list
