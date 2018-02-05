@@ -520,7 +520,7 @@ def cross_validate(train_file, labels_file, file_type, classifiers, save_model, 
         if len(p_shape) == 3:
             y_pred = y_pred.reshape(p_shape[1], p_shape[0], p_shape[2])
             y_pred = y_pred[:, :, 1]
-        assert (y_true.shape == y_pred.shape)
+        assert (test_labels.shape == y_pred.shape)
         print("Calculating ROC AUC score")
         loss = roc_auc_score(y_true=test_labels, y_score=predictions)
         print("ROC AUC is: {}".format(loss))
