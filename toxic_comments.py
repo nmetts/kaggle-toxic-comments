@@ -518,9 +518,9 @@ def cross_validate(train_file, labels_file, file_type, classifiers, save_model, 
         predictions = np.array(clf.predict_proba(test_data))
         p_shape = predictions.shape
         if len(p_shape) == 3:
-            y_pred = y_pred.reshape(p_shape[1], p_shape[0], p_shape[2])
-            y_pred = y_pred[:, :, 1]
-        assert (test_labels.shape == y_pred.shape)
+            predictions = predictions.reshape(p_shape[1], p_shape[0], p_shape[2])
+            predictions = predictions[:, :, 1]
+        assert (test_labels.shape == predictions.shape)
         print("Calculating ROC AUC score")
         loss = roc_auc_score(y_true=test_labels, y_score=predictions)
         print("ROC AUC is: {}".format(loss))
