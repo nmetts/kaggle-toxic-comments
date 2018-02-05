@@ -21,7 +21,7 @@ from scipy.sparse import csc_matrix, hstack
 from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
 from sklearn.externals import joblib
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics import log_loss
+from sklearn.metrics import log_loss, roc_auc_score
 from sklearn.model_selection import train_test_split
 from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import StandardScaler
@@ -516,9 +516,14 @@ def cross_validate(train_file, labels_file, file_type, classifiers, save_model, 
             persist_model(clf=clf)
         print("Making predictions")
         predictions = np.array(clf.predict_proba(test_data))
-        print("Calculating log loss")
-        loss = get_mean_log_loss(y_true=test_labels, y_pred=predictions)
-        print("Loss is: {}".format(loss))
+        p_shape = predictions.shape
+        if len(p_shape) == 3:
+            y_pred = y_pred.reshape(p_shape[1], p_shape[0], p_shape[2])
+            y_pred = y_pred[:, :, 1]
+        assert (y_true.shape == y_pred.shape)
+        print("Calculating ROC AUC score")
+        loss = roc_auc_score(y_true=test_labels, y_score=predictions)
+        print("ROC AUC is: {}".format(loss))
 
 
 if __name__ == '__main__':
