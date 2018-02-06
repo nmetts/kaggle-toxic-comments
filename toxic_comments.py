@@ -346,14 +346,16 @@ def get_classifiers(clf_names):
             base_estimator = clf_list[0]
         else:
             num_cpus = multiprocessing.cpu_count()
-            base_estimator = SGDClassifier(loss='modified_huber', n_jobs=int(num_cpus/6) - 1)
+            base_estimator = SGDClassifier(loss='log', n_jobs=int(num_cpus/6) - 1,
+                                           tol=1e-5, max_iter=1000, class_weight='balanced')
         clf_list.append(ClassifierChain(base_estimator=base_estimator))
     if MULTIOUTPUT_CLASSIFIER in clf_names:
         if clf_list:
             base_estimator = clf_list[0]
         else:
             num_cpus = multiprocessing.cpu_count()
-            base_estimator = SGDClassifier(loss='modified_huber', n_jobs=int(num_cpus/6) - 1)
+            base_estimator = SGDClassifier(loss='log', n_jobs=int(num_cpus/6) - 1,
+                                           tol=1e-5, max_iter=1000, class_weight='balanced')
         clf_list.append(MultiOutputClassifier(estimator=base_estimator, n_jobs=6))
     if STACKING in clf_names:
         # See if we can avoid hitting the recursion limit
@@ -392,7 +394,7 @@ def get_predictions(clf, test_data):
         test_data(np.array or scipy.sparse.csc_matrix): The test data used for predictions
     """
     print("Making predictions")
-    predictions = np.array(clf.predict_proba(test_data))
+    predictions = np.array(clf.predict(test_data))
     p_shape = predictions.shape
     if len(p_shape) == 3:
         predictions = predictions.reshape(p_shape[1], p_shape[0], p_shape[2])
@@ -534,7 +536,7 @@ def cross_validate(train_file, labels_file, file_type, classifiers, save_model, 
         if save_model:
             persist_model(clf=clf)
         print("Making predictions")
-        predictions = np.array(clf.predict_proba(test_data))
+        predictions = np.array(clf.predict(test_data))
         p_shape = predictions.shape
         if len(p_shape) == 3:
             predictions = predictions.reshape(p_shape[1], p_shape[0], p_shape[2])
