@@ -452,7 +452,7 @@ def predict(train_file, labels_file, test_file, id_file, file_type,
                 print("Transforming test data")
                 test_data = scaler.transform(test_data)
             print("Fitting to train data")
-            clf.fit(X=train_data, y=labels_mat)
+            clf.fit(train_data, labels_mat)
             if save_model:
                 persist_model(clf)
             predictions = get_predictions(clf=clf, test_data=test_data)
@@ -530,7 +530,7 @@ def cross_validate(train_file, labels_file, file_type, classifiers, save_model, 
             train_data = scaler.transform(train_data)
             print("Transforming test data")
             test_data = scaler.transform(test_data)
-        clf.fit(X=train_data, y=train_labels)
+        clf.fit(train_data, train_labels)
         if save_model:
             persist_model(clf=clf)
         print("Making predictions")
