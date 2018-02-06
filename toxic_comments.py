@@ -346,8 +346,8 @@ def get_classifiers(clf_names):
             base_estimator = clf_list[0]
         else:
             num_cpus = multiprocessing.cpu_count()
-            base_estimator = SGDClassifier(loss='log', n_jobs=int(num_cpus/6) - 1,
-                                           tol=1e-5, max_iter=1000, class_weight='balanced')
+            base_estimator = SGDClassifier(loss='log', n_jobs=-1, tol=1e-5, max_iter=1000,
+                                           class_weight='balanced')
         clf_list.append(ClassifierChain(base_estimator=base_estimator))
     if MULTIOUTPUT_CLASSIFIER in clf_names:
         if clf_list:
@@ -356,7 +356,7 @@ def get_classifiers(clf_names):
             num_cpus = multiprocessing.cpu_count()
             base_estimator = SGDClassifier(loss='log', n_jobs=int(num_cpus/6) - 1,
                                            tol=1e-5, max_iter=1000, class_weight='balanced')
-        clf_list.append(MultiOutputClassifier(estimator=base_estimator, n_jobs=6))
+        clf_list.append(MultiOutputClassifier(estimator=base_estimator))
     if STACKING in clf_names:
         # See if we can avoid hitting the recursion limit
         sys.setrecursionlimit(2000)
