@@ -9,6 +9,7 @@ Created on January 18, 2018
 import argparse
 import csv
 import datetime as dt
+import multiprocessing
 import os
 import re
 import sys
@@ -21,8 +22,10 @@ from scipy.sparse import csc_matrix, hstack
 from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
 from sklearn.externals import joblib
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import SGDClassifier
 from sklearn.metrics import log_loss, roc_auc_score
 from sklearn.model_selection import train_test_split
+from sklearn.multioutput import ClassifierChain, MultiOutputClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import StandardScaler
 from textblob import TextBlob
@@ -55,6 +58,8 @@ ADDITIONAL_COLUMN_FEATURES = [SPECIAL_CHARACTER_COUNT, NUM_WORDS, MEAN_WORD_LENG
 
 # Classifiers
 RANDOM_FOREST = 'random_forest'
+CLASSIFIER_CHAIN = 'classifier_chain'
+MULTIOUTPUT_CLASSIFIER = 'multioutput_classifier'
 EXTRA_TREES = 'extra_trees'
 MLP = 'mlp'
 STACKING = 'stacking'
@@ -336,6 +341,20 @@ def get_classifiers(clf_names):
         clf_list.append(MLPClassifier(hidden_layer_sizes=(200, 100, 50), verbose=True, max_iter=1000))
     if EXTRA_TREES in clf_names:
         clf_list.append(ExtraTreesClassifier(n_jobs=-1, n_estimators=400, class_weight='balanced'))
+    if CLASSIFIER_CHAIN in clf_names:
+        if clf_list:
+            base_estimator = clf_list[0]
+        else:
+            num_cpus = multiprocessing.cpu_count()
+            base_estimator = SGDClassifier(loss='modified_huber', n_jobs=int(num_cpus/6) - 1)
+        clf_list.append(ClassifierChain(base_estimator=base_estimator))
+    if MULTIOUTPUT_CLASSIFIER in clf_names:
+        if clf_list:
+            base_estimator = clf_list[0]
+        else:
+            num_cpus = multiprocessing.cpu_count()
+            base_estimator = SGDClassifier(loss='modified_huber', n_jobs=int(num_cpus/6) - 1)
+        clf_list.append(MultiOutputClassifier(estimator=base_estimator, n_jobs=6))
     if STACKING in clf_names:
         # See if we can avoid hitting the recursion limit
         sys.setrecursionlimit(2000)
