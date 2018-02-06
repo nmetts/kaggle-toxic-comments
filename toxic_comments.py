@@ -516,8 +516,8 @@ def cross_validate(train_file, labels_file, file_type, classifiers, save_model, 
         # Separate the labels columns from the train and test features
         train_labels = (train_data[LABEL_COLUMNS]).as_matrix()
         test_labels = (test_data[LABEL_COLUMNS]).as_matrix()
-        train_data.drop(LABEL_COLUMNS, axis=1, inplace=True)
-        test_data.drop(LABEL_COLUMNS, axis=1, inplace=True)
+        train_data = train_data.drop(LABEL_COLUMNS, axis=1)
+        test_data = test_data.drop(LABEL_COLUMNS, axis=1)
 
     clf_list = get_classifiers(classifiers)
 
